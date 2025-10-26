@@ -37,10 +37,10 @@ export const DEFAULT_NAVIGATION_DATA = {
 export const CORS_HEADERS = {
   // 使用更安全的CORS配置，避免使用通配符
   // 在Cloudflare Pages环境中，这通常会自动处理，但明确设置更安全
-  'Access-Control-Allow-Origin': self.location.origin || '*',
+  'Access-Control-Allow-Origin': '*', // 修正self.location.origin在Workers环境中不可用的问题
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age': '3600', // 减少预检请求缓存时间
+  'Access-Control-Max-Age': '3600',
   'Access-Control-Expose-Headers': 'Content-Type, X-Request-ID'
 };
 
@@ -188,32 +188,12 @@ export function handleOptions(request) {
   });
 }
 
-// 内存限流对象（简单实现）
-const rateLimitStore = new Map();
-
-// 检查是否超过限流
+// Cloudflare Workers不支持持久内存限流
+// 这里实现一个简单的无状态限流，在生产环境中应使用KV或Durable Objects
 export function checkRateLimit(ip) {
-  const now = Date.now();
-  const windowMs = 60 * 1000; // 1分钟窗口
-  const maxRequests = 60; // 每分钟最多60个请求
-  
-  if (!rateLimitStore.has(ip)) {
-    rateLimitStore.set(ip, []);
-  }
-  
-  const requests = rateLimitStore.get(ip);
-  
-  // 移除过期的请求记录
-  const recentRequests = requests.filter(time => now - time < windowMs);
-  rateLimitStore.set(ip, recentRequests);
-  
-  // 检查是否超过限制
-  if (recentRequests.length >= maxRequests) {
-    return false;
-  }
-  
-  // 添加新请求记录
-  recentRequests.push(now);
+  // 在Cloudflare Workers环境中，每个请求都是独立的，内存不是持久的
+  // 因此简单返回true，在生产环境中应实现基于KV或Durable Objects的限流
+  // 可以在将来升级为真正的限流实现
   return true;
 }
 
@@ -229,8 +209,8 @@ export function filterSensitiveData(data) {
   return filtered;
 }
 
-// 统一响应函数
-export function createResponse(data, status = 200, request = null) {
+// 统一响应函数 - 修正参数顺序
+export function createResponse(request, data, status = 200) {
   // 使用动态CORS头或默认值
   const corsHeaders = request ? getCorsHeaders(request) : CORS_HEADERS;
   

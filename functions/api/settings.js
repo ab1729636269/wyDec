@@ -21,9 +21,9 @@ export async function onRequest(context) {
     // 认证头验证 (仅对非OPTIONS请求)
     if (request.method !== 'OPTIONS') {
       const authHeader = request.headers.get('Authorization');
-      const expectedAuth = env.AUTH_KEY || 'default_auth_key'; // 使用环境变量或默认值
+      const validAuthKeys = [env.AUTH_KEY, env.ADMIN_PASSWORD, env.ADMIN_TOKEN].filter(Boolean);
       
-      if (!authHeader || authHeader !== expectedAuth) {
+      if (!authHeader || !validAuthKeys.includes(authHeader)) {
         return createResponse(request, {
           success: false,
           message: '未授权访问'

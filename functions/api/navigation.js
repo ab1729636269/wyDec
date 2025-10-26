@@ -21,9 +21,10 @@ export async function onRequest(context) {
   // 认证头验证 (仅对非OPTIONS请求)
   if (request.method !== 'OPTIONS') {
     const authHeader = request.headers.get('Authorization');
-    const expectedAuth = env.AUTH_KEY || 'default_auth_key'; // 使用环境变量或默认值
+    // 支持多种环境变量名称以兼容不同配置
+    const validAuthKeys = [env.AUTH_KEY, env.ADMIN_PASSWORD, env.ADMIN_TOKEN];
     
-    if (!authHeader || authHeader !== expectedAuth) {
+    if (!authHeader || !validAuthKeys.includes(authHeader)) {
       return createResponse(request, {
         success: false,
         message: '未授权访问'
@@ -43,6 +44,15 @@ export async function onRequest(context) {
         // POST方法特定逻辑 - 已在前面进行认证
         
         const body = await request.json();
+        
+        // 验证数据格式
+        if (!Array.isArray(body)) {
+          return createResponse(request, {
+            success: false,
+            message: '无效的数据格式，期望数组'
+          }, 400);
+        }
+        
         const success = await saveData('navigation', body, env);
         
         if (success) {

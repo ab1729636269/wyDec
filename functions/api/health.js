@@ -10,13 +10,34 @@ export async function onRequest(context) {
   }
   
   try {
+    // 尝试从KV存储读取数据以检查连接
+    let kvStatus = 'unknown';
+    try {
+      // 只是尝试读取一个简单的值来验证KV连接
+      const testValue = await context.env.NAVIGATOR_DATA.get('navigation');
+      kvStatus = testValue !== null ? 'connected' : 'empty';
+    } catch (kvError) {
+      console.error('KV连接测试失败:', kvError);
+      kvStatus = 'error';
+    }
+    
     // 健康检查
     if (request.method === 'GET') {
-      return createResponse(request, {
-        success: true,
-        message: '服务正常运行',
-        timestamp: Date.now()
-      }, 200);
+      // 构建健康检查响应
+      const healthResponse = {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        services: {
+          kv: kvStatus,
+          api: 'online'
+        },
+        environment: {
+          // 添加一些环境信息，但避免暴露敏感数据
+          has_auth: !!context.env.AUTH_KEY || !!context.env.ADMIN_PASSWORD || !!context.env.ADMIN_TOKEN
+        }
+      };
+      
+      return createResponse(request, healthResponse, 200);
     }
     
     // 方法不允许

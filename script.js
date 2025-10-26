@@ -217,9 +217,8 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
                 'X-Request-ID': requestId,
-                // 添加认证令牌 - 注意：在生产环境中，这个值应该从安全存储中获取
-                // 这里使用硬编码仅作为示例，实际应用中应避免
-                'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}`
+                // 移除Bearer前缀，直接使用令牌值以匹配后端期望格式
+                'Authorization': localStorage.getItem('admin_token') || ''
             }
         };
 
@@ -289,7 +288,7 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
 async function loadNavigationFromApi() {
       try {
          logger.info('尝试从API加载导航数据');
-         const data = await apiRequest('/api/navigation');
+         const data = await apiRequest('/navigation');
          if (data && data.success && data.data) {
              logger.info('成功从API加载导航数据');
              return data.data;
@@ -308,7 +307,7 @@ async function loadNavigationFromApi() {
 async function saveNavigationToApi(links) {
       try {
          logger.info('尝试保存导航数据到API');
-         const response = await apiRequest('/api/navigation', 'POST', links);
+         const response = await apiRequest('/navigation', 'POST', links);
          if (response && response.success) {
              logger.info('导航数据成功保存到API');
              return true;
