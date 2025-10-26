@@ -111,46 +111,7 @@ let appSettings = {
 // 导航链接数据
 let navigationLinks = [];
 
-// 初始化函数
-async function init() {
-    try {
-        // 加载设置和数据
-        loadLocalData();
-        
-        // 应用设置
-        applySettings();
-        
-        // 渲染导航链接
-        renderLinks();
-        
-        // 优化性能：添加事件委托处理点击事件
-        document.addEventListener('click', function(event) {
-          const linkElement = event.target.closest('.link-card');
-          if (linkElement && linkElement.href) {
-            // 链接已经有href，无需额外处理
-          }
-          
-          // 处理删除链接按钮点击
-          const deleteButton = event.target.closest('.delete-button');
-          if (deleteButton && deleteButton.parentNode) {
-            const linkId = deleteButton.parentNode.dataset.linkId;
-            if (linkId) deleteLink(linkId);
-          }
-        });
-        
-        // 设置事件监听器
-        setupEventListeners();
-        
-        console.log('导航页初始化完成');
-    } catch (error) {
-        console.error('初始化失败:', error);
-        // 如果API失败，使用本地存储的数据
-        if (navigationLinks.length === 0) {
-            navigationLinks = DEFAULT_LINKS;
-            renderLinks();
-        }
-    }
-}
+// 重复的init函数已删除 - 后续代码中已有完整实现
 
 // 加载本地数据
 function loadLocalData() {
@@ -416,40 +377,14 @@ function saveLocalData() {
 // 初始化函数
 async function init() {
     try {
-        // 首先加载本地数据作为基础
+        // 加载本地数据作为回退
         loadLocalData();
-        
-        // 检查API健康状态
-        const apiAvailable = await checkApiHealth();
-        
-        if (apiAvailable) {
-            // 尝试从API加载数据
-            const apiLinks = await loadNavigationFromApi();
-            if (apiLinks && apiLinks.length > 0) {
-                navigationLinks = apiLinks;
-                // 更新本地存储
-                localStorage.setItem('navigationLinks', JSON.stringify(navigationLinks));
-                console.log('已从云端同步导航数据');
-            }
-            
-            // 尝试从API加载设置
-            const apiSettings = await loadSettingsFromApi();
-            if (apiSettings) {
-                // 合并API设置和本地设置
-                appSettings = {...appSettings, ...apiSettings};
-                // 更新本地存储
-                localStorage.setItem('appSettings', JSON.stringify(appSettings));
-                console.log('已从云端同步设置');
-            }
-            
-            showMessage('已连接云端服务器', 'success');
-        }
         
         // 应用设置
         applySettings();
         
-        // 渲染导航链接
-        renderLinks();
+        // 立即设置事件监听器，确保按钮交互功能可用
+        setupEventListeners();
         
         // 优化性能：添加事件委托处理点击事件
         document.addEventListener('click', function(event) {
@@ -466,17 +401,57 @@ async function init() {
           }
         });
         
-        // 设置事件监听器
-        setupEventListeners();
+        // 渲染初始导航链接
+        renderLinks();
+        
+        // 异步检查API健康状态和加载云端数据，不阻塞UI
+        try {
+            const apiAvailable = await checkApiHealth();
+            if (apiAvailable) {
+                console.log('API可用，从云端加载数据...');
+                
+                // 异步加载API数据
+                const [apiLinks, apiSettings] = await Promise.all([
+                    loadNavigationFromApi().catch(() => null),
+                    loadSettingsFromApi().catch(() => null)
+                ]);
+                
+                // 更新导航链接
+                if (apiLinks && apiLinks.length > 0) {
+                    navigationLinks = apiLinks;
+                    renderLinks();
+                    localStorage.setItem('navigationLinks', JSON.stringify(navigationLinks));
+                    console.log('已从云端同步导航数据');
+                }
+                
+                // 更新设置
+                if (apiSettings) {
+                    appSettings = { ...appSettings, ...apiSettings };
+                    applySettings();
+                    localStorage.setItem('appSettings', JSON.stringify(appSettings));
+                    console.log('已从云端同步设置');
+                }
+                
+                showMessage('已连接云端服务器', 'success');
+            } else {
+                console.log('API不可用，使用本地数据');
+            }
+        } catch (apiError) {
+            console.error('API数据加载失败:', apiError);
+            // 不阻止继续运行，UI功能已可用
+        }
         
         console.log('导航页初始化完成');
     } catch (error) {
         console.error('初始化失败:', error);
-        // 如果发生错误，确保有数据可显示
+        // 确保至少显示默认链接
         if (navigationLinks.length === 0) {
             navigationLinks = DEFAULT_LINKS;
-            renderLinks();
         }
+        renderLinks();
+        // 确保事件监听器已设置
+        setupEventListeners();
+        showMessage('初始化时出现错误，使用默认设置', 'error');
     }
 }
 
