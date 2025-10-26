@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人导航页</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <!-- 背景元素 -->
+    <div id="background-container">
+        <div id="overlay"></div>
+        <img id="background-image" alt="背景图片" style="display: none;">
+    </div>
+    
+    <!-- 主要内容容器 -->
+    <div class="container">
+        <!-- 头像区域 -->
+        <div class="profile-section">
+            <div id="avatar-container" class="avatar-container">
+                <img id="user-avatar" src="" alt="用户头像">
+                <input type="file" id="avatar-upload" accept="image/*" style="display: none;">
+                <div class="avatar-upload-overlay">
+                    <span>+</span>
+                </div>
+            </div>
+            <h1 id="user-name">个人导航页</h1>
+        </div>
+        
+        <!-- 导航链接区域 -->
+        <div class="navigation-section">
+            <div class="category" id="category-main">
+                <h2>常用链接</h2>
+                <div class="links-grid" id="links-grid-main">
+                    <!-- 导航链接将通过JavaScript动态生成 -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- 控制面板按钮 -->
+        <div class="controls-section">
+            <button id="settings-button" class="control-button">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M19.4 15C19.2597 15.3031 19.0874 15.5794 18.8908 15.817C18.6941 16.0547 18.4775 16.2529 18.2465 16.4039C18.0155 16.5549 17.7719 16.6557 17.522 16.7012C17.2721 16.7467 17.019 16.7362 16.7771 16.6704C16.5351 16.6045 16.3051 16.4846 16.1 16.32V19C16.1 19.3712 15.9919 19.7326 15.7902 20.0465C15.5885 20.3605 15.3039 20.6127 14.966 20.786C14.628 20.9593 14.2544 21.0493 13.8815 21.052C13.5086 21.0547 13.1383 20.9695 12.8037 20.8016C12.4691 20.6337 12.1763 20.3881 11.9517 20.0857C11.727 19.7834 11.5782 19.4323 11.5177 19.0656C11.4573 18.699 11.4882 18.3266 11.6071 18L12.2 13L11.6071 8C11.4882 7.67342 11.4573 7.30102 11.5177 6.93437C11.5782 6.56771 11.727 6.21663 11.9517 5.91427C12.1763 5.61192 12.4691 5.36628 12.8037 5.19837C13.1383 5.03047 13.5086 4.94531 13.8815 4.94799C14.2544 4.95067 14.628 5.04072 14.966 5.21403C15.3039 5.38734 15.5885 5.63952 15.7902 5.95348C15.9919 6.26744 16.1 6.62882 16.1 7V9.68C16.3051 9.51544 16.5351 9.39546 16.7771 9.32961C17.019 9.26376 17.2721 9.25332 17.522 9.29882C17.7719 9.34431 18.0155 9.44515 18.2465 9.59611C18.4775 9.74707 18.6941 9.94527 18.8908 10.1829C19.0874 10.4206 19.2597 10.6969 19.4 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M5 9.37C5.81265 8.75253 6.76351 8.33654 7.77356 8.15618C8.78361 7.97583 9.82832 8.03737 10.8242 8.33277C11.8201 8.62816 12.7312 9.14473 13.4775 9.84841C14.2238 10.5521 14.7715 11.412 15.0619 12.3645C15.3523 13.317 15.3698 14.3196 15.0233 15.2563C14.6769 16.1929 13.9837 17.0174 13.0355 17.5979C12.0873 18.1784 10.9346 18.4829 9.77522 18.4829H9.70634C8.55895 18.4829 7.41714 18.1784 6.47879 17.5979C5.54045 17.0174 4.85598 16.1929 4.51842 15.2563C4.18086 14.3196 4.20602 13.317 4.49825 12.3645C4.79048 11.412 5.33838 10.5521 6.08464 9.84841C6.83091 9.14473 7.74196 8.62816 8.73786 8.33277" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                设置
+            </button>
+            <button id="add-link-button" class="control-button">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 5V19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                添加链接
+            </button>
+        </div>
+    </div>
+    
+    <!-- 设置模态框 -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>设置</h2>
+                <button id="close-settings" class="close-button">×</button>
+            </div>
+            <div class="modal-body">
+                <!-- 背景设置 -->
+                <div class="setting-section">
+                    <h3>背景设置</h3>
+                    <div class="setting-item">
+                        <label for="bg-type">背景类型:</label>
+                        <select id="bg-type">
+                            <option value="color">纯色背景</option>
+                            <option value="image">背景图片</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="bg-color">背景颜色:</label>
+                        <input type="color" id="bg-color" value="#1a1a2e">
+                    </div>
+                    <div class="setting-item bg-image-settings" style="display: none;">
+                        <label for="bg-image-upload">上传背景图片:</label>
+                        <input type="file" id="bg-image-upload" accept="image/*">
+                    </div>
+                    <div class="setting-item">
+                        <label for="bg-opacity">背景透明度:</label>
+                        <input type="range" id="bg-opacity" min="0" max="1" step="0.05" value="0.8">
+                        <span id="bg-opacity-value">80%</span>
+                    </div>
+                </div>
+                
+                <!-- 用户信息设置 -->
+                <div class="setting-section">
+                    <h3>用户信息</h3>
+                    <div class="setting-item">
+                        <label for="edit-user-name">用户名:</label>
+                        <input type="text" id="edit-user-name" placeholder="输入用户名">
+                    </div>
+                    <div class="setting-item">
+                        <label>用户头像:</label>
+                        <button id="change-avatar" class="secondary-button">更改头像</button>
+                    </div>
+                </div>
+                
+                <!-- 保存按钮 -->
+                <div class="modal-actions">
+                    <button id="save-settings" class="primary-button">保存设置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 添加链接模态框 -->
+    <div id="add-link-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>添加链接</h2>
+                <button id="close-add-link" class="close-button">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-section">
+                    <div class="setting-item">
+                        <label for="link-name">链接名称:</label>
+                        <input type="text" id="link-name" placeholder="输入链接名称">
+                    </div>
+                    <div class="setting-item">
+                        <label for="link-url">链接地址:</label>
+                        <input type="url" id="link-url" placeholder="输入链接地址">
+                    </div>
+                    <div class="setting-item">
+                        <label for="link-category">分类:</label>
+                        <select id="link-category">
+                            <option value="main">常用链接</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- 保存按钮 -->
+                <div class="modal-actions">
+                    <button id="save-link" class="primary-button">保存链接</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

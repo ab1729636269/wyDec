@@ -1,0 +1,7 @@
+# Cloudflare Pages 重定向配置文件
+
+# API请求例外 - 确保API请求不会被重定向
+/api/*  /api/:splat  200
+
+# 所有其他请求重定向到index.html（单页应用支持）
+/*  /index.html  200
