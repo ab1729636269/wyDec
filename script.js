@@ -1,6 +1,36 @@
 // API基础URL - 使用相对路径以便于部署
 const API_BASE_URL = '/api';
 
+// 统一日志工具函数
+const logger = {
+  debug: (...args) => {
+    if (process.env.NODE_ENV !== 'production' || localStorage.getItem('debug_mode') === 'true') {
+      console.debug('[DEBUG]', ...args);
+    }
+  },
+  info: (...args) => {
+    console.info('[INFO]', ...args);
+  },
+  warn: (...args) => {
+    console.warn('[WARNING]', ...args);
+  },
+  error: (error, context = '') => {
+    if (error instanceof Error) {
+      console.error(`[ERROR] ${context}:`, error.message, { stack: error.stack });
+    } else {
+      console.error(`[ERROR] ${context}:`, error);
+    }
+  },
+  // 启用调试模式
+  enableDebug: () => {
+    localStorage.setItem('debug_mode', 'true');
+  },
+  // 禁用调试模式
+  disableDebug: () => {
+    localStorage.removeItem('debug_mode');
+  }
+}
+
 // 性能优化工具函数
 // 防抖函数
 function debounce(func, wait) {
@@ -176,57 +206,125 @@ function saveLocalData() {
 
 // API调用函数 - 封装fetch请求
 async function apiRequest(endpoint, method = 'GET', data = null) {
+    const requestId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+    logger.debug(`API请求开始 [${requestId}]: ${method} ${endpoint}`);
+    
     try {
         const url = `${API_BASE_URL}${endpoint}`;
         const options = {
             method,
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'X-Request-ID': requestId,
+                // 添加认证令牌 - 注意：在生产环境中，这个值应该从安全存储中获取
+                // 这里使用硬编码仅作为示例，实际应用中应避免
+                'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}`
             }
         };
 
         if (data) {
+            logger.debug(`API请求数据 [${requestId}]:`, JSON.stringify(data).substring(0, 200) + (JSON.stringify(data).length > 200 ? '...' : ''));
             options.body = JSON.stringify(data);
         }
 
+        // 添加CORS模式支持Cloudflare Pages环境
+        options.credentials = 'omit'; // 遵循Cloudflare的安全最佳实践
+        options.mode = 'cors';
+
         const response = await fetch(url, options);
+        logger.debug(`API响应状态 [${requestId}]: ${response.status}`);
         
+        // 更友好的错误处理
         if (!response.ok) {
-            throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
+            // 尝试解析错误响应
+            let errorData;
+            try {
+                errorData = await response.json();
+            } catch (e) {
+                errorData = null;
+            }
+            
+            const errorMessage = errorData?.message || `API请求失败: ${response.status} ${response.statusText}`;
+            logger.error(errorMessage, `API错误详情 (${endpoint})`);
+            const statusError = new Error(errorMessage);
+            statusError.requestId = requestId;
+            statusError.endpoint = endpoint;
+            statusError.method = method;
+            statusError.status = response.status;
+            throw statusError;
         }
 
-        return await response.json();
+        // 确保响应是JSON格式
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            const result = await response.json();
+            logger.debug(`API响应成功 [${requestId}]`);
+            return result;
+        } else {
+            // 处理非JSON响应
+            const text = await response.text();
+            logger.warn(`非JSON响应从 ${endpoint}:`, text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+            // 尝试解析，可能是简单文本或错误信息
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                return { success: true, data: text, requestId };
+            }
+        }
     } catch (error) {
-        console.error(`API请求错误 (${endpoint}):`, error);
+        logger.error(error, `API请求错误 (${endpoint})`);
+        // 增强错误信息
+        if (!error.requestId) {
+            error.requestId = requestId;
+        }
+        error.endpoint = endpoint;
+        error.method = method;
+        // 重新抛出错误以便调用者处理
         throw error;
     }
 }
 
 // 从API加载导航数据
 async function loadNavigationFromApi() {
-    try {
-        const data = await apiRequest('/navigation');
-        if (data && data.links) {
-            return data.links;
-        }
-        return [];
-    } catch (error) {
-        console.warn('无法从API加载导航数据，使用本地数据', error);
-        return null; // 返回null表示API失败
-    }
-}
+      try {
+         logger.info('尝试从API加载导航数据');
+         const data = await apiRequest('/api/navigation');
+         if (data && data.success && data.data) {
+             logger.info('成功从API加载导航数据');
+             return data.data;
+          }
+         logger.warn('API返回了非预期的数据格式:', JSON.stringify(data).substring(0, 100));
+         // 如果API返回非预期格式，尝试使用本地存储的默认值
+         return DEFAULT_LINKS;
+      } catch (error) {
+         logger.error(error, '从API加载导航数据失败');
+         logger.info('API失败，使用本地默认数据');
+         return DEFAULT_LINKS;
+      }
+  }
 
 // 保存导航数据到API
 async function saveNavigationToApi(links) {
-    try {
-        await apiRequest('/navigation', 'POST', { links });
-        console.log('导航数据已同步到服务器');
-        return true;
-    } catch (error) {
-        console.error('无法保存导航数据到API', error);
-        showMessage('同步到云端失败，已保存到本地', 'warning');
-        return false;
+      try {
+         logger.info('尝试保存导航数据到API');
+         const response = await apiRequest('/api/navigation', 'POST', links);
+         if (response && response.success) {
+             logger.info('导航数据成功保存到API');
+             return true;
+         } else {
+             logger.warn('API返回保存失败:', response ? response.message : '未知错误');
+             // 保存到本地作为回退
+             localStorage.setItem('navigationLinks', JSON.stringify(links));
+             showMessage('同步到云端失败，已保存到本地', 'warning');
+             return false;
+         }
+      } catch (error) {
+         logger.error(error, '保存导航数据到API失败');
+         // 保存到本地作为回退
+         localStorage.setItem('navigationLinks', JSON.stringify(links));
+         showMessage('同步到云端失败，已保存到本地', 'warning');
+         return false;
     }
 }
 
@@ -777,6 +875,108 @@ function setupEventListeners() {
             addLink();
         }
     });
+}
+
+// 应用设置到UI
+function applySettings() {
+    try {
+        // 应用背景设置
+        if (appSettings.backgroundType === 'color') {
+            elements.backgroundImage.style.display = 'none';
+            elements.overlay.style.backgroundColor = appSettings.backgroundColor;
+        } else {
+            elements.overlay.style.backgroundColor = 'transparent';
+            elements.backgroundImage.src = appSettings.backgroundImage;
+            elements.backgroundImage.style.display = 'block';
+        }
+        
+        // 应用背景透明度
+        elements.overlay.style.opacity = appSettings.backgroundOpacity;
+        
+        // 应用用户名
+        elements.userName.textContent = appSettings.userName;
+        
+        // 应用头像
+        if (appSettings.userAvatar) {
+            elements.userAvatar.src = appSettings.userAvatar;
+        } else {
+            elements.userAvatar.src = '';
+        }
+        
+        // 应用背景设置UI状态
+        elements.bgColor.value = appSettings.backgroundColor || '#1a1a2e';
+        elements.bgType.value = appSettings.backgroundType || 'color';
+        elements.bgOpacity.value = appSettings.backgroundOpacity || 0.8;
+        elements.bgOpacityValue.textContent = `${Math.round((appSettings.backgroundOpacity || 0.8) * 100)}%`;
+        
+        // 显示/隐藏背景图片设置
+        elements.bgImageSettings.style.display = appSettings.backgroundType === 'image' ? 'block' : 'none';
+        
+    } catch (error) {
+        console.error('应用设置失败:', error);
+    }
+}
+
+// 渲染导航链接
+function renderLinks() {
+    try {
+        // 清空现有链接
+        elements.linksGridMain.innerHTML = '';
+        
+        // 获取主分类的链接
+        const mainLinks = navigationLinks.filter(link => link.category === 'main');
+        
+        if (mainLinks.length === 0) {
+            // 显示空状态
+            const emptyState = document.createElement('div');
+            emptyState.className = 'empty-state';
+            emptyState.textContent = '暂无链接，请点击"添加链接"按钮添加';
+            elements.linksGridMain.appendChild(emptyState);
+            return;
+        }
+        
+        // 渲染每个链接
+        mainLinks.forEach(link => {
+            const linkCard = document.createElement('a');
+            linkCard.className = 'link-card';
+            linkCard.href = link.url;
+            linkCard.target = '_blank';
+            linkCard.rel = 'noopener noreferrer';
+            linkCard.dataset.linkId = link.id;
+            
+            // 创建图标
+            const iconSpan = document.createElement('div');
+            iconSpan.className = 'link-icon';
+            iconSpan.textContent = link.icon || link.name.charAt(0).toUpperCase();
+            
+            // 创建名称
+            const nameSpan = document.createElement('div');
+            nameSpan.className = 'link-name';
+            nameSpan.textContent = link.name;
+            
+            // 创建删除按钮容器
+            const deleteContainer = document.createElement('div');
+            deleteContainer.className = 'delete-button';
+            deleteContainer.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 6H5H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+            deleteContainer.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                deleteLink(link.id);
+            });
+            
+            // 组装卡片
+            linkCard.appendChild(iconSpan);
+            linkCard.appendChild(nameSpan);
+            linkCard.appendChild(deleteContainer);
+            
+            // 添加到网格
+            elements.linksGridMain.appendChild(linkCard);
+        });
+        
+    } catch (error) {
+        console.error('渲染链接失败:', error);
+        showMessage('加载链接失败', 'error');
+    }
 }
 
 // 生成唯一ID

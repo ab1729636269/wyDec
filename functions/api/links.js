@@ -11,23 +11,36 @@ export async function onRequest(context) {
   }
   
   // 基本限流检查
-  if (!checkRateLimit(ip)) {
-    return createResponse({
-      success: false,
-      message: '请求过于频繁，请稍后再试'
-    }, 429);
-  }
+    if (!checkRateLimit(ip)) {
+      return createResponse(request, {
+        success: false,
+        message: '请求过于频繁，请稍后再试'
+      }, 429);
+    }
+
+    // 认证头验证 (仅对非OPTIONS请求)
+    if (request.method !== 'OPTIONS') {
+      const authHeader = request.headers.get('Authorization');
+      const expectedAuth = env.AUTH_KEY || 'default_auth_key'; // 使用环境变量或默认值
+      
+      if (!authHeader || authHeader !== expectedAuth) {
+        return createResponse(request, {
+          success: false,
+          message: '未授权访问'
+        }, 401);
+      }
+    }
   
   try {
     // 添加链接 (POST /api/links)
     if (request.method === 'POST') {
-      const navigationData = await getData('navigation_data', env);
+      const navigationData = await getData('navigation', env);
       let linkData;
       
       try {
         linkData = await request.json();
       } catch (e) {
-        return createResponse({
+        return createResponse(request, {
           success: false,
           message: '无效的JSON格式'
         }, 400);
@@ -35,7 +48,7 @@ export async function onRequest(context) {
       
       // 验证链接数据
       if (!linkData.name || !linkData.url) {
-        return createResponse({
+        return createResponse(request, {
           success: false,
           message: '链接名称和URL不能为空'
         }, 400);
@@ -47,7 +60,7 @@ export async function onRequest(context) {
         new URL(url);
         linkData.url = url;
       } catch (e) {
-        return createResponse({
+        return createResponse(request, {
           success: false,
           message: '无效的URL格式'
         }, 400);
@@ -69,16 +82,16 @@ export async function onRequest(context) {
       navigationData.links.push(newLink);
       
       // 保存到KV
-      const saved = await saveData('navigation_data', navigationData, env);
+      const saved = await saveData('navigation', navigationData, env);
       
       if (saved) {
-        return createResponse({
+        return createResponse(request, {
           success: true,
           message: '链接添加成功',
           data: newLink
         }, 201);
       } else {
-        return createResponse({
+        return createResponse(request, {
           success: false,
           message: '保存失败，请检查KV配置'
         }, 500);
@@ -88,10 +101,10 @@ export async function onRequest(context) {
     // 删除链接 (DELETE /api/links/:id)
     if (request.method === 'DELETE' && params.path[0]) {
       const linkId = params.path[0];
-      const navigationData = await getData('navigation_data', env);
+      const navigationData = await getData('navigation', env);
       
       if (!navigationData.links) {
-        return createResponse({
+        return createResponse(request, {
           success: false,
           message: '没有找到链接数据'
         }, 404);
@@ -103,22 +116,22 @@ export async function onRequest(context) {
       
       // 检查是否有链接被删除
       if (navigationData.links.length === initialLength) {
-        return createResponse({
+        return createResponse(request, {
           success: false,
           message: '链接不存在'
         }, 404);
       }
       
       // 保存到KV
-      const saved = await saveData('navigation_data', navigationData, env);
+      const saved = await saveData('navigation', navigationData, env);
       
       if (saved) {
-        return createResponse({
+        return createResponse(request, {
           success: true,
           message: '链接删除成功'
         });
       } else {
-        return createResponse({
+        return createResponse(request, {
           success: false,
           message: '保存失败，请检查KV配置'
         }, 500);
@@ -126,14 +139,14 @@ export async function onRequest(context) {
     }
     
     // 方法不允许
-    return createResponse({
+    return createResponse(request, {
       success: false,
       message: '不允许的HTTP方法'
     }, 405);
     
   } catch (error) {
     console.error('处理链接管理请求时出错:', error);
-    return createResponse({
+    return createResponse(request, {
       success: false,
       message: '服务器内部错误'
     }, 500);

@@ -12,22 +12,22 @@ export async function onRequest(context) {
   try {
     // 健康检查
     if (request.method === 'GET') {
-      return createResponse({
+      return createResponse(request, {
         success: true,
         message: '服务正常运行',
         timestamp: Date.now()
-      });
+      }, 200);
     }
     
     // 方法不允许
-    return createResponse({
+    return createResponse(request, {
       success: false,
       message: '不允许的HTTP方法'
     }, 405);
     
   } catch (error) {
     console.error('处理健康检查请求时出错:', error);
-    return createResponse({
+    return createResponse(request, {
       success: false,
       message: '服务器内部错误'
     }, 500);

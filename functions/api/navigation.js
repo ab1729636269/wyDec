@@ -12,78 +12,71 @@ export async function onRequest(context) {
   
   // 基本限流检查
   if (!checkRateLimit(ip)) {
-    return createResponse({
+    return createResponse(request, {
       success: false,
       message: '请求过于频繁，请稍后再试'
     }, 429);
   }
+
+  // 认证头验证 (仅对非OPTIONS请求)
+  if (request.method !== 'OPTIONS') {
+    const authHeader = request.headers.get('Authorization');
+    const expectedAuth = env.AUTH_KEY || 'default_auth_key'; // 使用环境变量或默认值
+    
+    if (!authHeader || authHeader !== expectedAuth) {
+      return createResponse(request, {
+        success: false,
+        message: '未授权访问'
+      }, 401);
+    }
+  }
   
   try {
-    // 获取导航数据
     if (request.method === 'GET') {
-      const navigationData = await getData('navigation_data', env);
-      return createResponse({
+      const data = await getData('navigation', env);
+      return createResponse(request, {
         success: true,
-        data: navigationData
-      });
-    }
-    
-    // 保存导航数据
-    if (request.method === 'POST') {
-      const navigationData = await getData('navigation_data', env);
-      let newData;
-      
+        data: data
+      }, 200);
+    } else if (request.method === 'POST') {
       try {
-        newData = await request.json();
-      } catch (e) {
-        return createResponse({
+        // POST方法特定逻辑 - 已在前面进行认证
+        
+        const body = await request.json();
+        const success = await saveData('navigation', body, env);
+        
+        if (success) {
+          return createResponse(request, {
+            success: true,
+            message: '导航数据已更新',
+            timestamp: new Date().toISOString()
+          }, 200);
+        } else {
+          return createResponse(request, {
+            success: false,
+            message: '无法保存导航数据'
+          }, 500);
+        }
+      } catch (jsonError) {
+        return createResponse(request, {
           success: false,
-          message: '无效的JSON格式'
+          message: '无效的JSON格式',
+          error: jsonError.message
         }, 400);
       }
-      
-      // 数据验证
-      if (!newData || typeof newData !== 'object') {
-        return createResponse({
-          success: false,
-          message: '无效的数据格式'
-        }, 400);
-      }
-      
-      // 合并数据
-      const updatedData = {
-        ...navigationData,
-        ...newData
-      };
-      
-      // 保存到KV
-      const saved = await saveData('navigation_data', updatedData, env);
-      
-      if (saved) {
-        return createResponse({
-          success: true,
-          message: '导航数据保存成功',
-          data: updatedData
-        });
-      } else {
-        return createResponse({
-          success: false,
-          message: '保存失败，请检查KV配置'
-        }, 500);
-      }
+    } else {
+      return createResponse(request, {
+        success: false,
+        message: '不允许的HTTP方法',
+        allowedMethods: ['GET', 'POST', 'OPTIONS']
+      }, 405);
     }
-    
-    // 方法不允许
-    return createResponse({
-      success: false,
-      message: '不允许的HTTP方法'
-    }, 405);
-    
   } catch (error) {
-    console.error('处理导航数据请求时出错:', error);
-    return createResponse({
+    console.error('Navigation API 错误:', error);
+    return createResponse(request, {
       success: false,
-      message: '服务器内部错误'
+      message: '服务器内部错误',
+      errorId: Date.now().toString(36)
     }, 500);
   }
 }

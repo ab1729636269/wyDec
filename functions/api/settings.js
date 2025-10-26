@@ -11,18 +11,31 @@ export async function onRequest(context) {
   }
   
   // 基本限流检查
-  if (!checkRateLimit(ip)) {
-    return createResponse({
-      success: false,
-      message: '请求过于频繁，请稍后再试'
-    }, 429);
-  }
+    if (!checkRateLimit(ip)) {
+      return createResponse(request, {
+        success: false,
+        message: '请求过于频繁，请稍后再试'
+      }, 429);
+    }
+
+    // 认证头验证 (仅对非OPTIONS请求)
+    if (request.method !== 'OPTIONS') {
+      const authHeader = request.headers.get('Authorization');
+      const expectedAuth = env.AUTH_KEY || 'default_auth_key'; // 使用环境变量或默认值
+      
+      if (!authHeader || authHeader !== expectedAuth) {
+        return createResponse(request, {
+          success: false,
+          message: '未授权访问'
+        }, 401);
+      }
+    }
   
   try {
     // 获取设置
     if (request.method === 'GET') {
-      const navigationData = await getData('navigation_data', env);
-      return createResponse({
+      const navigationData = await getData('navigation', env);
+      return createResponse(request, {
         success: true,
         data: navigationData.settings || DEFAULT_NAVIGATION_DATA.settings
       });
@@ -30,13 +43,13 @@ export async function onRequest(context) {
     
     // 保存设置
     if (request.method === 'POST') {
-      const navigationData = await getData('navigation_data', env);
+      const navigationData = await getData('navigation', env);
       let settingsData;
       
       try {
         settingsData = await request.json();
       } catch (e) {
-        return createResponse({
+        return createResponse(request, {
           success: false,
           message: '无效的JSON格式'
         }, 400);
@@ -44,7 +57,7 @@ export async function onRequest(context) {
       
       // 验证设置数据
       if (!settingsData || typeof settingsData !== 'object') {
-        return createResponse({
+        return createResponse(request, {
           success: false,
           message: '无效的设置格式'
         }, 400);
@@ -57,16 +70,16 @@ export async function onRequest(context) {
       };
       
       // 保存到KV
-      const saved = await saveData('navigation_data', navigationData, env);
+      const saved = await saveData('navigation', navigationData, env);
       
       if (saved) {
-        return createResponse({
+        return createResponse(request, {
           success: true,
           message: '设置保存成功',
           data: navigationData.settings
         });
       } else {
-        return createResponse({
+        return createResponse(request, {
           success: false,
           message: '保存失败，请检查KV配置'
         }, 500);
@@ -74,14 +87,14 @@ export async function onRequest(context) {
     }
     
     // 方法不允许
-    return createResponse({
+    return createResponse(request, {
       success: false,
       message: '不允许的HTTP方法'
     }, 405);
     
   } catch (error) {
     console.error('处理设置请求时出错:', error);
-    return createResponse({
+    return createResponse(request, {
       success: false,
       message: '服务器内部错误'
     }, 500);
